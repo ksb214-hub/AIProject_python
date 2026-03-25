@@ -1,12 +1,17 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 import time
 
 def crawl_recipe(search):
-    # 1. driver 셋팅 (요즘 selenium은 자동 driver 지원됨)
-    driver = webdriver.Chrome()
+    # 2. driver 셋팅 (백그라운드 실행)
+    options = Options()
+    options.add_argument("--headless")  # 창 안 띄움
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
 
-    # 2. 첫 번째 URL
+    driver = webdriver.Chrome(options=options)
+
     base_url = "https://www.10000recipe.com/recipe/list.html?q="
     detail_base_url = "https://www.10000recipe.com"
 
@@ -19,32 +24,40 @@ def crawl_recipe(search):
         count_element = driver.find_element(By.CSS_SELECTOR, "#contents_area_full > ul > div > b")
         recipe_count = int(count_element.text.replace(",", ""))
 
-        print(f"검색된 레시피 개수: {recipe_count}")
+        print(f"레시피 개수: {recipe_count}")
 
         # 5. 레시피가 1개 이상일 경우
         if recipe_count > 0:
-            first_recipe = driver.find_element(
+
+            recipe_list = driver.find_elements(
                 By.CSS_SELECTOR,
-                "#contents_area_full > ul > ul > li:nth-child(1) > div.common_sp_thumb > a"
+                "#contents_area_full > ul > ul > li"
             )
 
-            href = first_recipe.get_attribute("href")
-            title = first_recipe.get_attribute("title")
+            urls = []
 
-            print("첫 번째 레시피 제목:", title)
-            print("첫 번째 레시피 URL:", href)
+            # 5-1. for문
+            for item in recipe_list:
+                try:
+                    a_tag = item.find_element(By.CSS_SELECTOR, "div > a")
+                    href = a_tag.get_attribute("href")
+                    urls.append(href)
+                except:
+                    continue
 
-            # 6. 상세 페이지 이동
-            # href가 절대경로면 그대로 사용
-            if href.startswith("http"):
-                detail_url = href
-            else:
-                detail_url = detail_base_url + href
+            # 6. 첫 번째 URL 출력
+            if urls:
+                first_url = urls[0]
+                print("첫 번째 레시피 URL:", first_url)
 
-            print("상세 페이지 이동:", detail_url)
+                # 7. 상세 페이지 이동
+                if first_url.startswith("http"):
+                    detail_url = first_url
+                else:
+                    detail_url = detail_base_url + first_url
 
-            driver.get(detail_url)
-            time.sleep(2)
+                driver.get(detail_url)
+                time.sleep(2)
 
         # 5-2. 레시피가 없는 경우
         else:
@@ -54,7 +67,7 @@ def crawl_recipe(search):
         print("오류 발생:", e)
 
     finally:
-        # 7. driver 종료 (맨 마지막)
+        # 8. driver 종료
         driver.quit()
 
 
