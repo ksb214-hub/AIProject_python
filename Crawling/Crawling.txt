@@ -1,145 +1,225 @@
-구조
-    |
-    |- AIProject1.py
-    |
-    |- Crawling/
-        |_Crawling.py
+Crawling.py 문서화 
 
-Crawling.py
 전체 흐름
-    검색 → 리스트 수집 → 선택 → 상세 → 재료 추출 → 정제 → DataFrame
+    검색 → 리스트 수집 → 선택 → 상세 → 재료 추출 → 정제 → DataFrame → 추천 시스템
 
 목표
-    웹스크랩핑을 통하여 데이터를 수집하는 것을 목표로 한다.
+    웹스크래핑을 통하여 레시피 데이터를 수집하고,
+    수집된 데이터를 기반으로 추천 시스템에 활용하는 것을 목표로 한다.
 
 사용 언어
-    python
+    Python
 
-사용 라이브러리 
-    Selenium, beautifulsoup, pandas, time, re  
-해당 첫 번째 파싱 url
-https://www.10000recipe.com/recipe/list.html?q=
 
-해당 두 번째 파싱 url 
-https://www.10000recipe.com
+사용 라이브러리
+    Selenium
+	BeautifulSoup
+	Pandas
+	time
+	re
 
-레시피 개수 selector
-이 구조는 사이트 변경되면 깨질 수 있음 → 나중에 class 기반 selector로 개선 추천
-#contents_area_full > ul > div > b
 
-url selector
-#contents_area_full > ul > ul > li
-
-재료 selector
-    #divConfirmedMaterialArea > ul:nth-child(1) > li
-
-순서도 
-1. 검색어 입력(검색어 변수: search)   
-2. driver 셋팅(백그라운드에서 driver 실행) 
-3. driver.get(첫 번째 파싱 url + search)
-4. 레시피 개수 selector 사용해서 갯수 파싱하기 
-5. 레시피 개수가 1개 이상일 경우 
-    5-1. for in 문 
-        5-1-1. selector: div > a 
-            url href 파싱하기
-        5-1-2. selector: div.common_sp_caption > div.common_sp_caption_tit.line2
-            title text 파싱하기 
-        5-2. title, href list append하기
-
-5. 레시피 개수가 0개 미만 일 경우
-    5-2. 해당 레시피가 존재 하지 않습니다.
+크롤링 대상 URL
+    첫 번째 파싱 URL (검색 페이지)
+        https://www.10000recipe.com/recipe/list.html?q=
+    
+    두 번째 파싱 URL (상세 페이지)
+        https://www.10000recipe.com
+    
+    Selector 정보
+        레시피 개수 selector
+            #contents_area_full > ul > div > b
+            해당 구조는 사이트 변경 시 깨질 수 있음 → class 기반 selector로 개선 필요
         
-6.href, title 결과 출력하기 
-7. input으로 원하는 title 입력하기(0은 종료)
-    7-1. 0 입력시
-        driver 종료
-8. driver.get(두번째 파싱 url + (원하는 title index)href)
-9. beautifulsoup html파싱하기 
-10. 재료 selector for in 문
-    10-1. 만약 구매 단어 있으면
-        구매 단어 제거 후 재료 
-11. 재료 list 형태로 append
-12. 재료 list pandas 형태로 변환 
-13. print(pandas 형태) 출력 
+        URL selector
+            #contents_area_full > ul > ul > li
+        
+        재료 selector
+            #divConfirmedMaterialArea > ul:nth-child(1) > li
 
-핵심 변경 포인트
+순서도
+1. 검색어 입력
+    검색어 변수: search
 
-driver 종료 위치 수정
-    중간 종료 → 오류 발생
-    마지막에 종료
+2. driver 설정
+    백그라운드 실행 (headless 모드)
 
-두 번째 URL 처리 방식
+3. 검색 페이지 접속
+    driver.get(첫 번째 파싱 url + search)
+
+4. 레시피 개수 파싱
+    selector를 이용하여 레시피 개수 추출
+
+5. 레시피 존재 여부 판단
+    5-1. 레시피 개수가 1개 이상일 경우
+	    for 문을 통해 리스트 순회
+
+        5-1-1. URL 파싱
+            selector: div > a
+            href 추출
+        
+        5-1-2. 제목 파싱
+            selector: div.common_sp_caption > div.common_sp_caption_tit.line2
+        
+        5-1-3. 데이터 저장
+            title, href 리스트에 append
+        
+    5-2. 레시피 개수가 0일 경우
+        해당 레시피가 존재하지 않습니다.
+        break
+
+6. 레시피 목록 출력
+    [1] 김치찌개  
+    [2] 된장찌개  
+    [0] 종료  
+    [auto] 자동 수집  
+
+
+7. 사용자 입력 처리
+
+    7-1. 0 입력 시
+        프로그램 종료 (driver 종료)
+        break
+
+    7-2. auto 입력 시
+        상위 N개 레시피 자동 수집
+
+    7-3. 숫자 입력 시
+        해당 index 레시피 선택
+        index 보정 필요 (idx - 1)
+
+
+8. 상세 페이지 이동
     if href.startswith("http"):
         detail_url = href
     else:
         detail_url = detail_base_url + href
+    
+    상대경로 / 절대경로 처리 필수
 
-    사이트에 따라 상대경로 / 절대경로 다르기 때문에 필수 처리
+9. HTML 파싱
+    BeautifulSoup 사용
 
-최신 Selenium 반영
-    driver = webdriver.Chrome()
-    이제 webdriver-manager 없이도 자동 처리됨
+10. 재료 추출
+    selector 기반 반복문 수행
 
-li 기준 반복 구조
-    recipe_list = driver.find_elements(By.CSS_SELECTOR, "#contents_area_full > ul > ul > li")
-    페이지에 있는 모든 레시피 카드 가져오기
+    10-1. 재료 정제 로직
+        text = ing.get_text(strip=True)
+        text = text.replace("구매", "")
+        text = re.split(r"\d", text)[0]
 
-내부에서 a 태그 찾기
-    a_tag = item.find_element(By.CSS_SELECTOR, "div > a")
-    구조가 바뀌어도 비교적 안전
+    	‘구매’ 제거
+        용량(숫자) 제거
+        재료명만 추출
 
-URL 리스트화
-    urls.append(href)
+11. 재료 리스트 저장
+    list 형태로 append
 
-백그라운드 실행
-    options.add_argument("--headless")
-    - 속도 ↑
-	- 리소스 ↓
-	- 자동화 서버에 적합
+12. 데이터 누적
+	선택된 레시피의 재료를 누적 저장
+	자동 수집 시에도 동일하게 누적
 
-재료 추출 핵심 로직
-    text = ing.get_text(strip=True)
-    text = text.replace("구매", "")
-    text = re.split(r"\d", text)[0]
+13. DataFrame 변환
+    pandas DataFrame 생성
 
-종료 기능 추가
-    if idx == 0:
-        driver.quit()
-        return
+14. 결과 출력
+    재료 데이터 출력
 
-사용자 입력 UX 개선
-    [1] 김치찌개
-    [2] 된장찌개
-    [0] 종료
+15. 추천 시스템 실행
+	- 사용자 보유 재료 입력
+	- 레시피 재료와 비교
 
-index 보정
-    selected_url = urls[idx - 1]
-    사용자: 1번 선택 → 코드: 0번 index
+    추천 방식
+	    교집합 기반 유사도 계산
+        유사도 = (겹치는 재료 수) / (전체 재료 수)
+        유사도 높은 순으로 정렬 후 출력
 
 
 흐름 요약
-[입력]
-검색어 입력
+    [입력]
+    검색어 입력
 
-↓
-[크롤링]
-레시피 목록 수집
+        ↓
+    [크롤링]
+    레시피 목록 수집
 
-↓
-[선택]
-- 개별 선택
-- 자동 수집
-- 종료
+        ↓
+    [선택]
+    - 개별 선택
+    - 자동 수집
+    - 종료
 
-↓
-[데이터 처리]
-재료 추출 + 정제 + 누적
+        ↓
+    [데이터 처리]
+    재료 추출 + 정제 + 누적
 
-↓
-[데이터 구조화]
-DataFrame 생성
+        ↓
+    [데이터 구조화]
+    DataFrame 생성
 
-↓
-[추천 시스템]
-사용자 재료 입력 → 유사도 계산 → 추천 출력
+        ↓
+    [추천 시스템]
+    사용자 재료 입력 → 유사도 계산 → 추천 출력
+
+
+핵심 변경 포인트
+    driver 종료 위치 수정
+	    - 기존: 중간 종료 → 오류 발생 가능
+	    - 수정: 마지막에 종료 (finally)
+
+    두 번째 URL 처리 방식
+        if href.startswith("http"):
+            detail_url = href
+        else:
+            detail_url = detail_base_url + href
+
+        - 사이트 구조에 따라 상대/절대 경로 처리 필수
+    
+    최신 Selenium 반영
+        driver = webdriver.Chrome()
+
+        - webdriver-manager 없이 자동 실행 가능
+
+    li 기준 반복 구조
+        driver.find_elements(By.CSS_SELECTOR, "#contents_area_full > ul > ul > li")
+        
+        - 모든 레시피 카드 수집
+
+    내부 a 태그 접근
+        item.find_element(By.CSS_SELECTOR, "div > a")
+        
+        - 구조 변경에도 비교적 안정적
+    
+    URL 리스트화
+        urls.append(href)
+    
+    백그라운드 실행
+        options.add_argument("--headless")
+        - 속도 향상
+	    - 리소스 절약
+	    - 서버 환경에 적합
+    
+    재료 추출 핵심 로직
+        text = ing.get_text(strip=True)
+        text = text.replace("구매", "")
+        text = re.split(r"\d", text)[0]
+    
+    종료 기능
+        if idx == 0:
+            driver.quit()
+            return
+    
+    사용자 입력 UX 개선
+        [1] 김치찌개
+        [2] 된장찌개
+        [0] 종료
+        [auto] 자동 수집
+    
+    index 보정
+        selected_url = urls[idx - 1]
+    
+    ✔ 예외 처리 (추가)
+	•	selector 변경 시 오류 가능
+	•	잘못된 index 입력
+	•	네트워크 지연
 
