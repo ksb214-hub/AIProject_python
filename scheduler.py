@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from Crawling.Crawling import auto_crawl
+from Crawling.Crawling import crawl
 
 def run_scheduler():
 
@@ -10,7 +10,7 @@ def run_scheduler():
 
     for keyword in search_keywords:
         print(f"수집 중: {keyword}")
-        df = auto_crawl(keyword, limit=5)
+        df = crawl(keyword, limit=5)
         all_df.append(df)
 
     final_df = pd.concat(all_df, ignore_index=True)
