@@ -5,31 +5,26 @@
 import re
 
 class DataCleaner:
-    """
-    [흐름: 원본 텍스트 입력 -> 정규표현식 필터링 -> 정제된 텍스트 반환]
-    데이터의 일관성을 유지하기 위한 가공 유틸리티 클래스
-    """
-    
     @staticmethod
     def clean_title(title_text):
-        """
-        레시피 제목에 포함된 특수문자나 불필요한 줄바꿈 제거
-        """
-        if not title_text: 
-            return ""
-        
-        # 1. \n, \r, \t 등 제어 문자를 공백으로 치환
-        # 2. re.sub(r'\s+', ' ', ...) : 연속된 공백을 하나로 합침
-        refined = re.sub(r'\s+', ' ', title_text).strip()
-        
-        # 3. 추가적인 특수 기호 정제가 필요할 경우 여기에 패턴 추가 가능
-        return refined
+        """레시피 제목 정제 (기존 로직)"""
+        if not title_text: return ""
+        return re.sub(r'\s+', ' ', title_text).strip()
 
     @staticmethod
-    def extract_id_from_url(url):
+    def clean_material(material_text):
         """
-        [흐름: URL 문자열 스캔 -> 패턴 매칭 -> ID 숫자 추출]
-        예: https://.../recipe/6900000 -> 6900000 추출
+        [흐름: 원본 텍스트 -> '구매' 키워드 제거 -> 연속 공백 정제 -> 최종 반환]
+        예: "돼지갈비 900g 구매" -> "돼지갈비 900g"
         """
-        match = re.search(r'/recipe/(\d+)', url)
-        return match.group(1) if match else None
+        if not material_text:
+            return ""
+        
+        # 1. '구매' 단어 제거 (정규표현식 사용)
+        # r'구매' 뒤에 공백이 있을 수 있으므로 처리
+        refined = re.sub(r'구매', '', material_text)
+        
+        # 2. 양 끝 공백 제거 및 중간의 연속된 공백을 하나로 축소
+        refined = re.sub(r'\s+', ' ', refined).strip()
+        
+        return refined
