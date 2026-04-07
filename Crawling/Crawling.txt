@@ -1,216 +1,135 @@
-Crawling.py 설계 문서
+Crawling.py 설계문서 
 
 1. 개요 (Overview)
-    Crawling.py 모듈은 레시피 웹사이트에서 음식 레시피와 재료 데이터를 수집하는 웹 스크래핑 모듈이다.
-    사용자가 입력한 검색어를 기반으로 레시피 목록을 수집하고,
-    선택한 레시피의 상세 페이지에서 재료 정보를 추출하여 데이터 구조로 변환한다.
-    수집된 데이터는 이후 재료 기반 추천 시스템의 입력 데이터로 활용된다.
-    
-    이를 통해 다음과 같은 장점을 얻을 수 있다.
-        레시피 데이터 자동 수집
-        데이터 기반 추천 시스템 구축
-        반복적인 데이터 수집 작업 자동화
+    Crawling.py 모듈은 웹스크래핑을 통해서 레시피의 재료를
+    추출하는 것을 목표로하는 웹 스크래핑 모듈이다. 
+    사용자가 입력한 검색어를 기반으로 레시피의 제목, url를 추출하여 
+    향후 상세 페이지로 이동하여 재료 및 레시피 데이터를 추출할 예정이다.
 
-2. Crawling 모듈 구조
-    프로젝트에서 Crawling 모듈은 다음 구조로 구성된다.
-        AIProject1.py
-        │
-        ├─ Crawling/
-        │   │
-        │   ├─ Crawling.py
-        │   └─ driver.py
+
+2. 역할 
+    Crawling.py
+        웹 페이지에서 레시피 제목과 url를 추출한다. 
+        레시피 제목과 url를 바탕으로 향후 해당 레시피와 재료를 추출한다.
+
+3. 사용기술
+    사용 라이브러리 
+        Python 
+            Selenium
+            bs4
+            webdriver_manager
+            time
+
+
+4. 순서도 
+    1. 사용자에게 input을 통해 검색어를 입력 받는다.
+    2. driver를 셋팅한다.
+    3. 검색 URL 뒤에 검색어를 붙여 검색 결과를 가져온다
+    4. 레시피 개수 selector를 통해
+        4.1 레시피 개수가 0개이면 종료
+    5. 레시피 개수가 1개 이상일 경우 검색 결과 페이지에 표시된 모든 레시피 카드 요소를 가져온다.
+    6. 데이터 추출(레시피 제목, 레시피 URL)
+    -> 이 데이터는 각각 리스트에 저장된다
+        titles.append(title)
+        urls.append(url)
+
+5. 사용 URL 
+    검색 페이지
+        https://www.10000recipe.com/recipe/list.html?q=
+        검색어를 URL 뒤에 붙여 레시피 검색 결과를 가져온다.
+
         
-    각 파일의 역할은 다음과 같다.
-            파일	        역할
-        Crawling.py	    웹 스크래핑 로직 수행
-        driver.py	    Selenium WebDriver 설정
 
-       
-3. Crawling.py 역할
-    Crawling.py는 다음과 같은 기능을 수행한다.
-        → 검색 페이지 크롤링
-        → 레시피 목록 수집
-        → 사용자 레시피 선택
-        → 상세 페이지 이동
-        → 재료 데이터 추출
-        → 데이터 정제
-        → DataFrame 생성
-
-4. 사용 기술 (Technology)
-    Crawling 모듈에서는 다음 라이브러리를 사용한다.
-        Python
-        Selenium
-        BeautifulSoup
-        Pandas
-        time
-        re
-
-    각 라이브러리의 역할은 다음과 같다.
-
-        라이브러리	    역할
-    Selenium	    웹 브라우저 자동화
-    BeautifulSoup	HTML 파싱
-    Pandas	        데이터 구조화
-    time	        로딩 대기 처리
-    re	            문자열 정제
+    예시
+        https://www.10000recipe.com/recipe/list.html?q=김치
 
 
-5. 크롤링 대상 사이트 구조
-    크롤링 대상 사이트는 다음 URL 구조를 가진다.
-        검색 페이지
-            https://www.10000recipe.com/recipe/list.html?q=
-            검색어를 URL 뒤에 붙여 레시피 검색 결과를 가져온다.
-        
-        예시
-            https://www.10000recipe.com/recipe/list.html?q=김치
+    상세 페이지
+        https://www.10000recipe.com
+        상세 레시피 페이지는 상대 경로 형태로 제공되기 때문에 base URL과 결합하여 사용해야 한다.    
 
-        상세 페이지
-            https://www.10000recipe.com
-            상세 레시피 페이지는 상대 경로 형태로 제공되기 때문에 base URL과 결합하여 사용해야 한다.    
 
 6. 주요 Selector 정보
     Crawling.py는 다음 selector를 사용하여 데이터를 수집한다.
-    
+
     레시피 개수 selector        
         #contents_area_full > ul > div > b
         검색 결과의 레시피 개수를 확인하는 selector이다.
+
+
 
         주의사항
             해당 selector는 DOM 구조에 의존하기 때문에 사이트 구조가 변경될 경우 동작하지 않을 수 있다.
             향후 class 기반 selector로 개선이 필요하다.
 
+
+
     레시피 목록 selector
         #contents_area_full > ul > ul > li
         검색 결과 페이지에 표시된 모든 레시피 카드 요소를 가져온다.
+
+
 
     재료 selector
         #divConfirmedMaterialArea > ul:nth-child(1) > li
         레시피 상세 페이지에서 재료 목록을 추출하는 selector이다.
 
-7. Crawling 처리 흐름
-    Crawling.py는 다음과 같은 흐름으로 동작한다.
-        검색 → 레시피 목록 수집 → 레시피 선택 → 상세 페이지 이동 
-        → 재료 추출 → 데이터 정제 → DataFrame 생성 → 추천 시스템 입력
 
-8. 레시피 목록 수집
-    사용자가 입력한 검색어를 기반으로 검색 페이지에 접속한다.
-        driver.get(search_url)
+시니어의 조언 (Technical Review)
+    Selector의 유연성
+        작성해주신 #contents_area_full > ul > ul > li는 구조가 조금만 바뀌어도 깨지기 쉽습니다.
+        만개한레시피의 경우 레시피 카드가 공통적으로 common_sp_list_li 클래스를 가집니다. 
+        추후 문제가 생기면 soup.select('.common_sp_list_li') 형태로 변경하는 것을 추천합니다.
 
-    이후 레시피 카드 selector를 이용하여 모든 레시피 목록을 가져온다.
-        driver.find_elements(By.CSS_SELECTOR)
+    Anti-Bot 회피
+        백그라운드(headless) 실행 시 서버에서 봇으로 감지하고 차단할 수 있습니다. 
+        위 코드에 user-agent 설정을 넣어두었으니 차단을 최소화할 수 있을 겁니다.
+
+    데이터 가공(re) 준비
+        추후 상세 페이지에서 재료를 긁어올 때 100g, 2큰술, 약간 같은 텍스트가 섞여 들어올 텐데, 
+        이때 정규표현식(re)을 사용하여 **[재료명, 수량, 단위]**로 파싱하는 로직을 별도 모듈로 분리하면 챗봇 답변 생성 시 훨씬 깔끔한 데이터를 줄 수 있습니다.
+
+
+에러
+    Traceback (most recent call last):
+    File "/Users/gangseongbin/Desktop/develop/python/AIProject/Crawling/Crawling.py", line 2, in <module>
+        from driver.driver_loader import get_headless_driver
+    ModuleNotFoundError: No module named 'driver'
+
+    원인    
+        파이썬의 모듈 탐색 경로(System Path)
+        파이썬은 실행되는 파일(Crawling.py)의 위치를 기준으로 모듈을 찾는데, 
+        driver 폴더가 Crawling 폴더 내부에 있느냐, 
+        아니면 그 상위(AIProject)에 있느냐에 따라 참조 방식이 달라짐
+
+    해결 방안 
+        1. 패키지 초기화 (__init__.py) 추가
+            파이썬은 특정 폴더를 "패키지"로 인식하려면 내부에 __init__.py 파일이 있어야 함 
+            (Python 3.3+ 이후로는 필수는 아니지만, 명시적 구분과 하위 호환성을 위해 시니어들은 습관적으로 만듬)
+            driver/ 폴더 안에 비어있는 파일인 __init__.py를 생성
+            utils/ (혹은 다른 폴더)가 있다면 거기에도 생성
+
+        2. 실행 경로(CWD) 이슈 해결 (가장 추천하는 방법)
+            터미널에서 AIProject 위치에 있는데 python Crawling/Crawling.py를 실행하면,
+            파이썬은 Crawling 폴더 내부만 먼저 뒤짐 
+            driver 폴더가 한 단계 위에 있다면 찾지 못하는 게 당연함
+            이럴 땐 -m (module mode) 플래그를 사용하여 프로젝트 루트에서 실행
+            
+            터미널  
+                # AIProject 폴더 위치에서 실행                
+                python -m Crawling.Crawling
+
+        3. 절대 경로 강제 삽입 (임시 방편)
+            만약 구조가 복잡해서 위 방법이 안 된다면, 
+            Crawling.py 최상단에 상위 폴더를 탐색 경로에 추가하는 코드를 넣을 수 있음
+
+            python
+                import sys
+                import os
+
+                # 현재 파일의 부모의 부모 폴더(AIProject)를 경로에 추가
+                sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
+                from driver.driver_loader import get_headless_driver
+
         
-    각 레시피 카드에서 다음 정보를 추출한다.
-        → 레시피 제목
-        → 레시피 URL
-
-    이 데이터는 각각 리스트에 저장된다.
-        titles.append(title)
-        urls.append(href)  
-
-9. 사용자 레시피 선택
-    사용자는 다음 방식으로 레시피를 선택할 수 있다.
-        [1] 김치찌개
-        [2] 된장찌개
-        [0] 종료
-        [auto] 자동 수집
-    
-
-    선택 방식은 다음과 같다.
-        입력	    동작
-        숫자	해당 레시피 선택
-        auto	상위 레시피 자동 수집
-        0	    프로그램 종료
-
-    주의사항
-        Python 리스트는 0부터 시작하기 때문에 index 보정이 필요하다.
-
-10. 상세 페이지 이동
-    레시피 상세 페이지는 상대 경로 또는 절대 경로 형태로 제공된다.
-    따라서 다음과 같은 처리 과정이 필요하다.    
-        if href.startswith("http"):
-            detail_url = href
-        else:
-            detail_url = base_url + href
-    
-11. 재료 데이터 추출
-    상세 페이지 HTML을 BeautifulSoup으로 파싱한 후
-    재료 selector를 이용하여 데이터를 추출한다.
-        ingredients = soup.select(selector)
-    
-    각 재료는 반복문을 통해 추출된다.
-        for ing in ingredients:
-
-
-12. 데이터 정제
-    크롤링된 재료 데이터에는 다음과 같은 불필요한 정보가 포함될 수 있다.
-
-    예시
-        돼지고기 200g 구매
-    
-    이를 정제하기 위해 다음 과정을 수행한다.
-        text = ing.get_text(strip=True)
-        text = text.replace("구매", "")
-        text = re.split(r"\d", text)[0]
-
-    
-    정제 결과
-        돼지고기
-
-
-13. 데이터 구조화
-    정제된 재료 데이터는 리스트에 저장된 후
-    Pandas DataFrame 형태로 변환된다.
-
-    예시
-        레시피      재료
-        김치찌개    김치
-        김치찌개    돼지고기
-        김치찌개    두부
-    
-14. 추천 시스템 연동
-    수집된 데이터는 재료 기반 추천 시스템의 입력 데이터로 활용된다.
-    
-    추천 방식은 다음과 같다.
-        유사도 = (겹치는 재료 수) / (전체 재료 수)
-    사용자가 가진 재료와 레시피 재료의 교집합을 기반으로 유사도를 계산한다.
-
-
-15. Crawling 모듈 특징
-    Crawling 모듈은 다음과 같은 특징을 가진다.
-    → 자동화된 레시피 데이터 수집
-    → 재료 기반 데이터 구조 생성
-    → 추천 시스템과 연동 가능한 구조
-    → 확장 가능한 모듈 구조
-
-16. 데이터 흐름
-    Crawling 모듈의 데이터 흐름은 다음과 같다.
-        
-        사용자 입력
-            │
-            ▼
-        검색 페이지 크롤링
-            │
-            ▼
-        레시피 목록 수집
-            │
-            ▼
-        상세 페이지 크롤링
-            │
-            ▼
-        재료 데이터 추출
-            │
-            ▼
-        데이터 정제
-            │
-            ▼
-        DataFrame 생성
-            │
-            ▼
-        추천 시스템 입력
-
-17. 정리
-    Crawling.py 모듈은 레시피 웹사이트에서 데이터를 수집하는 핵심 모듈이다.
-    이 모듈을 통해 다음과 같은 효과를 얻을 수 있다.
-    → 레시피 데이터 자동 수집
-    → 추천 시스템용 데이터셋 구축
-    → 반복적인 데이터 수집 작업 자동화
