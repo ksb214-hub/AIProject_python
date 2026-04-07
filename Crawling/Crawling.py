@@ -1,80 +1,55 @@
-from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-import pandas as pd
-import time
+from driver.driver_loader import get_headless_driver
+from utils.data_processor import DataCleaner
 
-from Crawling.driver import get_driver
-from Utils.text_clean import clean_text
+class RecipeCrawler:
+    def __init__(self):
+        self.base_url = "https://www.10000recipe.com"
+        self.driver = get_headless_driver() # 라이브러리 호출
+        self.cleaner = DataCleaner()       # 가공 도구 로드
 
-def crawl(search):
+    def fetch_recipe_list(self, keyword):
+        search_url = f"{self.base_url}/recipe/list.html?q={keyword}"
+        self.driver.get(search_url)
+        
+        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+        
+        # 레시피 개수 체크 (제공해주신 Selector 활용)
+        count_tag = soup.select_one('#contents_area_full > ul > div > b')
+        if not count_tag or count_tag.get_text().strip() == '0':
+            return []
 
-    driver = get_driver()
+        # 레시피 카드 목록 추출
+        items = soup.select('#contents_area_full > ul > ul > li')
+        results = []
 
-    base_url = "https://www.10000recipe.com/recipe/list.html?q="
-    driver.get(base_url + search)
-    time.sleep(2)
+        for item in items:
+            title_el = item.select_one('div.common_sp_caption_tit.line2')
+            link_el = item.select_one('a.common_sp_link')
 
-    recipe_list = driver.find_elements(By.CSS_SELECTOR, "#contents_area_full > ul > ul > li")
+            if title_el and link_el:
+                # 데이터 가공 라이브러리 사용
+                clean_title = self.cleaner.clean_title(title_el.get_text())
+                full_url = self.base_url + link_el['href']
+                
+                results.append({
+                    "title": clean_title,
+                    "url": full_url
+                })
+        
+        return results
 
-    titles = []
-    urls = []
+    def quit(self):
+        self.driver.quit()
 
-    for item in recipe_list:
-        try:
-            href = item.find_element(By.CSS_SELECTOR, "div > a").get_attribute("href")
-            title = item.find_element(
-                By.CSS_SELECTOR,
-                "div.common_sp_caption > div.common_sp_caption_tit.line2"
-            ).text.strip()
-
-            titles.append(title)
-            urls.append(href)
-
-        except:
-            continue
-
-    all_data = []
-
-    while True:
-        print("\n=== 레시피 목록 ===")
-        for i, t in enumerate(titles):
-            print(f"[{i+1}] {t}")
-
-        print("[0] 종료 / [auto] 자동수집")
-
-        choice = input("입력: ")
-
-        if choice == "0":
-            break
-
-        elif choice == "auto":
-            for i in range(min(5, len(urls))):
-                driver.get(urls[i])
-                time.sleep(1)
-
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-                ingredients = soup.select("#divConfirmedMaterialArea > ul:nth-child(1) > li")
-
-                for ing in ingredients:
-                    text = clean_text(ing.get_text(strip=True))
-                    if text:
-                        all_data.append([titles[i], text])
-
-        else:
-            idx = int(choice) - 1
-
-            driver.get(urls[idx])
-            time.sleep(1)
-
-            soup = BeautifulSoup(driver.page_source, "html.parser")
-            ingredients = soup.select("#divConfirmedMaterialArea > ul:nth-child(1) > li")
-
-            for ing in ingredients:
-                text = clean_text(ing.get_text(strip=True))
-                if text:
-                    all_data.append([titles[idx], text])
-
-    driver.quit()
-
-    df = pd.DataFrame(all_data, columns=["레시피", "재료"])
-    return df
+# 실행 테스트
+if __name__ == "__main__":
+    keyword = input("어떤 요리를 찾으시나요? : ")
+    crawler = RecipeCrawler()
+    
+    try:
+        data = crawler.fetch_recipe_list(keyword)
+        for entry in data:
+            print(f"제목: {entry['title']} | 링크: {entry['url']}")
+    finally:
+        crawler.quit()
