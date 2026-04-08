@@ -1,148 +1,158 @@
 # Crawling/Crawling.py
-# 이 파일은 프로젝트의 **'컨트롤러'**입니다. 
-# 위 라이브러리들을 사용하여 실제로 웹사이트에 접속하고 데이터를 리스트화합니다.
+# 이 파일은 프로젝트의 **'컨트롤러'**이자 **'메인 엔트리 포인트'**입니다.
 
-# [표준 라이브러리]
-# time: 웹 페이지 로딩 대기 및 프로세스 간격 조절을 위한 시간 제어 모듈
 import time
-
-# [제3자 라이브러리 (External)]
-# BeautifulSoup: Selenium이 가져온 HTML 소스코드를 계층 구조로 파싱하여 데이터 추출을 돕는 도구
+import pandas as pd
 from bs4 import BeautifulSoup
-
-# ThreadPoolExecutor: 멀티스레딩 구현을 위한 실행기. 여러 브라우저를 동시에 띄워 수집 속도를 극대화함
-# as_completed: 생성된 스레드 작업들 중 먼저 완료된 순서대로 결과를 반환받기 위한 반복자(Iterator)
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# [내부 모듈 (Internal Libraries)]
-# driver_loader: 프로젝트 전용 Selenium WebDriver 설정 및 생성 라이브러리 (공통 엔진)
+# [내부 모듈 임포트]
 from driver.driver_loader import get_headless_driver
-
-# data_processor: 수집된 텍스트에서 불필요한 단어('구매' 등)를 정규표현식으로 제거하는 정제 도구
 from utils.data_processor import DataCleaner
-
-# data_frame_factory: 수집된 리스트 데이터를 Pandas DataFrame으로 변환 및 관리하는 데이터 전담 모듈
 from processing.data_frame_factory import RecipeDataManager
-
+# Recipe 폴더 내의 챗봇 모듈 임포트
+from Recipe.RecipeChatBot import run_recipe_chatbot
 
 class RecipeCrawler:
     """
-    [설계 의도: 고성능 병렬 스크래핑 컨트롤러]
-    - 목록은 단일 드라이버로 빠르게, 상세 페이지는 멀티스레드로 동시 수집합니다.
+    [역할: 고성능 병렬 레시피 수집 컨트롤러]
+    1. 목록 스캔 -> 2. 병렬 수집 -> 3. 정제 및 가공 -> 4. 챗봇 서비스 연결
     """
+
     def __init__(self):
         self.base_url = "https://www.10000recipe.com"
         self.cleaner = DataCleaner()
-        self.driver = None # 메인 드라이버 참조용 (에러 방지)
 
     def fetch_recipe_list(self):
-        """[흐름: 검색어 입력 -> 목록 페이지 접속 -> 제목/URL 리스트화]"""
+        """목록 페이지 접속 및 레시피 URL 리스트 확보"""
         list_driver = get_headless_driver()
         try:
             keyword = input("어떤 레시피를 검색할까요? : ")
             search_url = f"{self.base_url}/recipe/list.html?q={keyword}"
+            
+            print(f"📡 '{keyword}' 검색 결과 페이지에 접속 중...")
             list_driver.get(search_url)
             time.sleep(1.5)
 
             soup = BeautifulSoup(list_driver.page_source, 'html.parser')
-            
-            # 레시피 개수 확인 (Selector: #contents_area_full > ul > div > b)
             count_tag = soup.select_one('#contents_area_full > ul > div > b')
+            
             if not count_tag or count_tag.get_text().strip() == '0':
-                print(f"'{keyword}' 검색 결과가 없습니다.")
+                print(f"⚠️ '{keyword}'에 대한 검색 결과가 없습니다.")
                 return [], []
 
-            # 레시피 카드 요소 추출
             recipe_items = soup.select('#contents_area_full > ul > ul > li')
             titles, urls = [], []
 
             for item in recipe_items:
                 title_el = item.select_one('div.common_sp_caption_tit.line2')
                 link_el = item.select_one('a.common_sp_link')
+                
                 if title_el and link_el:
-                    titles.append(self.cleaner.clean_title(title_el.get_text()))
-                    urls.append(self.base_url + link_el['href'])
+                    clean_title = self.cleaner.clean_title(title_el.get_text())
+                    full_url = self.base_url + link_el['href']
+                    titles.append(clean_title)
+                    urls.append(full_url)
             
+            print(f"✅ 총 {len(titles)}개의 레시피 후보를 발견했습니다.")
             return titles, urls
         finally:
-            list_driver.quit() # 목록 수집용 드라이버 즉시 종료
+            list_driver.quit()
 
     def fetch_recipe_detail_worker(self, title, url):
-        """[스레드 작업 유닛: 각 상세 페이지 접속 및 데이터 추출]"""
+        """개별 상세 페이지 수집 (스레드 단위 작업)"""
         worker_driver = get_headless_driver()
         try:
             worker_driver.get(url)
             time.sleep(1.2)
             soup = BeautifulSoup(worker_driver.page_source, 'html.parser')
             
-            # 이미지 및 재료 데이터 추출
             img_tag = soup.select_one('#main_thumbs')
             image_url = img_tag['src'] if img_tag else "이미지 없음"
             
             material_tags = soup.select('#divConfirmedMaterialArea > ul:nth-child(1) > li')
-            materials = [self.cleaner.clean_material(mat.get_text(separator=' ', strip=True)) 
-                         for mat in material_tags if mat]
-            
-            return {"title": title, "url": url, "image": image_url, "materials": materials}
+            origin_mats, pure_mats = [], []
+
+            for mat in material_tags:
+                raw_text = mat.get_text(separator=' ', strip=True)
+                c_text = self.cleaner.clean_material(raw_text)
+                p_text = self.cleaner.extract_pure_material(c_text)
+                if c_text: origin_mats.append(c_text)
+                if p_text: pure_mats.append(p_text)
+
+            step_container = soup.select_one('#obx_recipe_step_start')
+            recipe_steps = []
+            if step_container:
+                step_list = step_container.select('.view_step_cont')
+                for idx, step in enumerate(step_list, 1):
+                    step_text = step.get_text(strip=True)
+                    if step_text:
+                        clean_step = self.cleaner.clean_title(step_text)
+                        recipe_steps.append(f"{idx}. {clean_step}")
+
+            return {
+                "title": title, "url": url, "image": image_url,
+                "materials": origin_mats, "pure_materials": pure_mats, "steps": recipe_steps
+            }
         except Exception as e:
-            print(f"❌ 수집 오류 [{title}]: {e}")
+            print(f"❌ 수집 실패 [{title}]: {e}")
             return None
         finally:
-            worker_driver.quit() # 스레드 종료 시 브라우저 강제 종료 (메모리 확보)
+            worker_driver.quit()
 
     def collect_parallel(self, titles, urls, max_workers=4):
-        """[ThreadPoolExecutor를 통한 병렬 처리 실행]"""
+        """병렬 수집 실행 및 결과 취합"""
         final_collection = []
+        print(f"🚀 병렬 수집 시작 (작업 스레드: {max_workers})...")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 작업 할당
             futures = {executor.submit(self.fetch_recipe_detail_worker, titles[i], urls[i]): i for i in range(len(urls))}
-            
-            # 완료된 순서대로 결과 취합
             for future in as_completed(futures):
                 result = future.result()
                 if result:
                     final_collection.append(result)
-                    print(f"✅ 완료: {result['title']}")
+                    print(f"✅ 수집 완료: {result['title']}")
         return final_collection
 
-# --- 메인 실행부 ---
+# --- [Main Execution Flow] ---
 if __name__ == "__main__":
     crawler = RecipeCrawler()
     
     try:
-        # 1. 목록 수집
-        t_list, u_list = crawler.fetch_recipe_list()
-        
-        if t_list:
-            # 2. 병렬 상세 수집 (동시 4개 브라우저 가동)
-            raw_data = crawler.collect_parallel(t_list, u_list, max_workers=4)
-            
-            # 3. 데이터 가공 및 결과 출력 (Processing 모듈 호출)
-            manager = RecipeDataManager(raw_data)
-            manager.process_to_dataframe()
-            
-    except Exception as e:
-        print(f"❗ 시스템 오류 발생: {e}")
-# --- 메인 실행부 ---
-if __name__ == "__main__":
-    crawler = RecipeCrawler()
-    
-    try:
-        # 1. 목록 가져오기
+        # [Step 1] 레시피 목록 확보
         recipe_titles, recipe_urls = crawler.fetch_recipe_list()
         
         if recipe_titles:
-            # 2. 병렬로 상세 데이터 수집 (사양에 따라 max_workers 조절 가능)
-            # 맥북 프로 환경이므로 4~6 정도를 추천합니다.
-            raw_details = crawler.collect_all_details(recipe_titles, recipe_urls, max_workers=4)
+            # [Step 2] 상세 정보 병렬 크롤링 (상위 40개 기준)
+            raw_dataset = crawler.collect_parallel(recipe_titles, recipe_urls, max_workers=4)
             
-            # 3. 데이터 가공 모듈 호출 (Processing/DataProcessor.py)
-            manager = RecipeDataManager(raw_details)
+            # [Step 3] 데이터 가공 및 정형화 (Pandas DataFrame)
+            manager = RecipeDataManager(raw_dataset)
             processed_df = manager.process_to_dataframe()
             
-            if processed_df is not None:
-                print("\n✨ 모든 작업이 완료되었습니다.")
-                # 필요시 여기서 manager.save_csv() 호출 가능
-                
+            if processed_df is not None and not processed_df.empty:
+                # --- [출력 옵션 설정] ---
+                pd.set_option('display.max_columns', None)
+                pd.set_option('display.unicode.east_asian_width', True)
+                pd.set_option('display.width', 1000)
+                pd.set_option('display.max_colwidth', 30)
+
+                print("\n" + "✨" * 30)
+                print("   데이터 수집 및 가공이 완료되었습니다.")
+                print("✨" * 30)
+
+                # [요약 보고]
+                print(f"\n📊 데이터 요약: 총 {len(processed_df)}개의 레시피 확보")
+                print(f"🔎 샘플 확인: {processed_df[['title', 'pure_materials_str']].head(3)}")
+
+                # [Step 4] AI 챗봇 실행
+                # 가공된 데이터를 RecipeChatBot.py의 실행 함수로 전달합니다.
+                print("\n🤖 AI 챗봇 학습 및 가동을 시작합니다. 잠시만 기다려 주세요...")
+                run_recipe_chatbot(processed_df)
+
+            else:
+                print("❌ 가공할 데이터가 확보되지 않았습니다.")
+        else:
+            print("⚠️ 검색 결과가 없어 프로그램을 종료합니다.")
+
     except Exception as e:
         print(f"❗ 메인 로직 실행 중 오류 발생: {e}")

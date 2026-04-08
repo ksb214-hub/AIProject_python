@@ -5,51 +5,33 @@ import pandas as pd
 
 class RecipeDataManager:
     """
-    [데이터 검증 레이어]
-    수집된 raw_data를 DataFrame으로 변환하고, 저장 전 상태를 모니터링합니다.
+    [Data Flow: List[Dict] -> DataFrame -> 필드 최적화 -> 최종 데이터셋]
+    1. 여러 스레드에서 수집된 개별 레시피 딕셔너리들을 하나의 거대한 표로 통합합니다.
+    2. 서비스(챗봇)에서 즉시 출력할 수 있도록 리스트를 문자열(String)로 직렬화합니다.
     """
     def __init__(self, raw_data):
         self.raw_data = raw_data
-        self.df = None
+
 
     def process_to_dataframe(self):
         """
-        [흐름: 변환 -> 정제 -> 검증 출력]
+        [흐름: 수집 데이터 로드 -> 문자열 병합(Join) -> 중복 URL 제거 -> 리포트 생성]
         """
-        if not self.raw_data:
-            print("\n[⚠️ Alert] 전달된 데이터가 없어 DataFrame을 생성할 수 없습니다.")
-            return None
+        if not self.raw_data: return None
 
-        # 1. 변환
-        self.df = pd.DataFrame(self.raw_data)
+        df = pd.DataFrame(self.raw_data)
 
-        # 2. 가공 (재료 리스트를 문자열로 결합)
-        self.df['materials_str'] = self.df['materials'].apply(
-            lambda x: ', '.join(x) if isinstance(x, list) else ""
-        )
+        # [데이터 가공 흐름] 챗봇 응답용 텍스트 생성
+        # 리스트 형태의 재료/단계를 사람이 읽기 편한 줄바꿈/콤마 텍스트로 변환합니다.
+        if 'materials' in df.columns:
+            df['materials_str'] = df['materials'].apply(lambda x: ', '.join(x) if isinstance(x, list) else "")
+        # --- 🔎 이 부분이 누락되어 에러가 발생했습니다! 추가해 주세요 ---
+        if 'pure_materials' in df.columns:
+            df['pure_materials_str'] = df['pure_materials'].apply(lambda x: ', '.join(x) if isinstance(x, list) else "")
+        if 'steps' in df.columns:
+            df['steps_display'] = df['steps'].apply(lambda x: '\n'.join(x) if isinstance(x, list) else "")
 
-        # 3. 데이터 중복 제거
-        self.df.drop_duplicates(subset=['url'], keep='first', inplace=True)
-
-        # [검증 단계] 출력 섹션
-        print("\n" + "="*50)
-        print("📊 DATAFRAME 가공 결과 보고서")
-        print("="*50)
+        # [데이터 무결성 흐름] 동일한 레시피가 중복 저장되지 않도록 URL을 기준으로 고유값만 남깁니다.
+        df.drop_duplicates(subset=['url'], keep='first', inplace=True)
         
-        # 데이터 크기 확인
-        print(f"1. 전체 행/열 크기: {self.df.shape} (행, 열)")
-        
-        # 컬럼명 및 데이터 타입 확인
-        print("\n2. 컬럼 정보:")
-        print(self.df.dtypes)
-        
-        # 데이터 샘플 확인 (상위 5개)
-        print("\n3. 데이터 샘플 (상단 5개):")
-        # 모든 컬럼이 잘 보이도록 옵션 설정 (선택 사항)
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', 1000)
-        print(self.df.head(5))
-        
-        print("="*50 + "\n")
-        
-        return self.df
+        return df
