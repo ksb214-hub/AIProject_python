@@ -1,100 +1,88 @@
+import sqlite3
 import pandas as pd
-from chatterbot import ChatBot
-from chatterbot.trainers import ListTrainer
-
-# [시니어 개발자의 설계 노트]
-# 1. 데이터 로드: 크롤링된 DataFrame을 챗봇이 읽을 수 있는 지식원으로 활용합니다.
-# 2. 학습(Training): 레시피 제목을 기반으로 질문-답변 쌍을 생성하여 학습시킵니다.
-# 3. 로직 분기: 사용자의 의도(재료 궁금함 vs 조리법 궁금함)를 파악하여 답변합니다.
+from Crawling.Crawling import RecipeCrawler 
 
 class RecipeAssistant:
-    def __init__(self, recipe_df):
+    def __init__(self):
         """
-        [흐름: 챗봇 초기화 및 지식 베이스(DataFrame) 연결]
+        [시니어의 설계 의도]
+        1. self.user_persona: 사용자의 성향을 저장하여 맞춤형 필터링을 수행합니다.
+        2. self.crawler: DB에 데이터가 없을 때만 깨어나는 정예 요원입니다.
         """
-        self.db = recipe_df
-        # 챗봇 객체 생성 (데이터 보관 및 논리 처리를 담당)
-        self.bot = ChatBot(
-            'RecipeMaster',
-            logic_adapters=[
-                'chatterbot.logic.BestMatch', # 가장 유사한 질문을 찾는 로직
-                'chatterbot.logic.MathematicalEvaluation' # 수치 계산 필요 시 사용
-            ]
-        )
-        self.trainer = ListTrainer(self.bot)
+        self.db_path = 'recipes.db'
+        self.crawler = RecipeCrawler()
+        self.user_persona = None  # 사용자 페르소나 (자취생/요리 초보 등)
+        self.current_recipe = None
 
-    def train_with_recipes(self):
+    def get_response(self, user_input):
         """
-        [흐름: 크롤링 데이터 -> 대화형 리스트 변환 -> 학습]
-        - 레시피 제목을 학습시켜 사용자가 제목만 말해도 대응하게 합니다.
+        [흐름: 페르소나 설정 체크 -> DB 검색(페르소나 반영) -> 실시간 수집 -> 답변]
         """
-        print("🤖 레시피 데이터를 기반으로 인공지능 학습을 시작합니다...")
+        clean_input = user_input.replace(" ", "")
+
+        # --- [Step 1: 페르소나 설정/변경 로직] ---
+        # 사용자가 본인의 상태를 말하면 페르소나를 고정합니다.
+        persona_msg = self._check_and_set_persona(clean_input)
+        if persona_msg:
+            return persona_msg
+
+        # --- [Step 2: DB 검색 (페르소나 필터링 포함)] ---
+        # 데이터 기획자라면 여기서 페르소나에 맞는 키워드를 쿼리에 섞어야 합니다.
+        recipe = self._search_db_with_persona(clean_input)
         
-        for _, row in self.db.iterrows():
-            # 대화 패턴 학습: "제목 알려줘" -> "해당 레시피는 ~입니다"
-            conversation = [
-                row['title'],
-                f"{row['title']} 레시피를 찾으셨군요! 재료가 궁금하신가요, 아니면 조리 순서가 궁금하신가요?"
-            ]
-            self.trainer.train(conversation)
-        print("✅ 학습이 완료되었습니다.")
+        if recipe is not None:
+            self.current_recipe = recipe
+            return f"✅ {self.user_persona or '사용자'}님께 딱 맞는 레시피를 DB에서 찾았습니다!\n<{recipe['title']}>입니다. 재료나 순서를 알려드릴까요?"
 
-    def get_recipe_info(self, user_input):
+        # --- [Step 3: 온디맨드 실시간 수집] ---
+        # DB에 없을 때만 실행하여 리소스를 아낍니다.
+        if any(word in clean_input for word in ['알려줘', '찾아줘', '방법', '레시피']):
+            print(f"🔍 '{user_input}' 정보가 없어 실시간 수집 및 페르소나 매칭을 시작합니다...")
+            new_data_df = self.crawler.collect_on_demand(user_input)
+            
+            if new_data_df is not None and not new_data_df.empty:
+                # 수집된 데이터에 현재 페르소나 태그를 입혀서 저장 (데이터 자산화)
+                new_data_df['persona_tag'] = self.user_persona
+                self._save_to_db(new_data_df)
+                
+                self.current_recipe = new_data_df.iloc[0]
+                return f"✨ 실시간으로 찾아왔어요! <{self.current_recipe['title']}> 레시피를 안내해 드릴게요."
+
+        return "어떤 요리가 궁금하신가요? '자취생'이나 '요리 초보'라고 말씀하시면 맞춤 추천도 가능해요!"
+
+    def _check_and_set_persona(self, clean_input):
+        """사용자의 입력을 감지해 페르소나를 설정하는 내부 로직"""
+        if '자취' in clean_input or '혼자' in clean_input:
+            self.user_persona = '자취생'
+            return "🏠 [자취생 모드 활성] 간단하고 가성비 좋은 요리 위주로 보여드릴게요!"
+        if '초보' in clean_input or '요린이' in clean_input:
+            self.user_persona = '요리 초보'
+            return "🐣 [요리 초보 모드 활성] 실패 없는 황금 레시피 위주로 찾아드릴게요!"
+        return None
+
+    def _search_db_with_persona(self, keyword):
         """
-        [흐름: 사용자 입력 분석 -> 데이터 검색 -> 맞춤 답변 추출]
+        [데이터 기획의 핵심] 
+        사용자 페르소나에 따라 SQL 쿼리에 가중치를 둡니다.
         """
-        # 1. 사용자가 언급한 레시피 제목이 데이터에 있는지 확인 (키워드 매칭)
-        # 10년차 노하우: 완전 일치가 아닌 '포함' 여부로 유연하게 검색합니다.
-        matched_recipe = self.db[self.df_contains(user_input)]
+        conn = sqlite3.connect(self.db_path)
+        
+        # 기본 쿼리: 제목 검색
+        query = f"SELECT * FROM recipes WHERE title LIKE '%{keyword}%'"
+        
+        # 페르소나가 설정되어 있다면 해당 태그가 있는 데이터를 우선적으로 가져오도록 기획 가능
+        # (여기서는 간단하게 제목에 페르소나 관련 키워드가 있는지도 함께 검색)
+        if self.user_persona == '자취생':
+            query += " AND (title LIKE '%간단%' OR title LIKE '%한그릇%' OR title LIKE '%전자레인지%')"
+        elif self.user_persona == '요리 초보':
+            query += " AND (title LIKE '%황금%' OR title LIKE '%백종원%' OR title LIKE '%비법%')"
 
-        if not matched_recipe.empty:
-            recipe = matched_recipe.iloc[0]
-            
-            # 2. 사용자의 의도 파악 (재료 vs 순서)
-            if '재료' in user_input or '뭐 들어가' in user_input:
-                return f"📍 [{recipe['title']}]의 재료입니다:\n{recipe['materials_str']}"
-            
-            elif '순서' in user_input or '방법' in user_input or '어떻게' in user_input:
-                return f"👨‍🍳 [{recipe['title']}] 조리 순서입니다:\n{recipe['steps_display']}"
-            
-            else:
-                return f"<{recipe['title']}> 레시피가 준비되어 있습니다. '재료'나 '조리 순서'를 물어봐 주세요!"
+        df = pd.read_sql(query, conn)
+        conn.close()
+        return df.iloc[0] if not df.empty else None
 
-        # 3. 데이터에 없는 경우 ChatterBot의 기본 응답 엔진 사용
-        return self.bot.get_response(user_input)
-
-    def df_contains(self, user_input):
-        """제목 포함 여부를 체크하는 헬퍼 함수"""
-        return self.db['title'].apply(lambda x: x in user_input or user_input in x)
-
-# --- [Main Execution Flow] ---
-def run_recipe_chatbot(processed_df):
-    """
-    [전체 실행 흐름]
-    1. 가공된 데이터를 챗봇 엔진에 주입합니다.
-    2. 데이터셋의 모든 레시피 제목을 학습시킵니다.
-    3. 무한 루프를 통해 사용자와 대화를 주고받습니다.
-    """
-    # 챗봇 인스턴스 생성
-    assistant = RecipeAssistant(processed_df)
-    
-    # 레시피 학습 (크롤링한 40개 데이터 주입)
-    assistant.train_with_recipes()
-
-    print("\n" + "="*50)
-    print("🥘 AI 레시피 가이드 대화를 시작합니다! (종료: '종료')")
-    print("예시: '목살스테이크 재료 알려줘', '돼지고기 김치찌개 조리법 뭐야?'")
-    print("="*50)
-
-    while True:
-        user_msg = input("\n나: ")
-        if user_msg in ['종료', 'exit', 'quit']:
-            print("🤖 즐거운 요리 시간 되세요! 종료합니다.")
-            break
-
-        # 챗봇의 핵심 로직 호출
-        response = assistant.get_recipe_info(user_msg)
-        print(f"🤖 챗봇: {response}")
-
-# 이 코드는 Crawling.py의 메인 섹션 하단에서 호출됩니다.
-# run_recipe_chatbot(processed_df)
+    def _save_to_db(self, df):
+        """새 데이터를 DB에 추가 (메모리 절약 및 데이터 비축)"""
+        conn = sqlite3.connect(self.db_path)
+        df.to_sql('recipes', conn, if_exists='append', index=False)
+        conn.close()
