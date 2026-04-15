@@ -56,7 +56,9 @@
 
 ```mermaid
 flowchart TD
-A[검색어 수집] --> B[Driver 세션 생성]
+
+A[검색어 수집<br>사용자 입력 또는 Batch 작업] --> B[driver_loader로<br>브라우저 세션 생성]
+
 B --> C[검색 페이지 접속]
 C --> D[레시피 목록 스캔]
 D --> E{검색 결과 존재}
@@ -68,7 +70,8 @@ I --> J[상세 페이지 데이터 추출]
 J --> K[데이터 1차 정제]
 K --> L[데이터 직렬화]
 L --> M[Database 저장]
-M --> N[Driver 종료]
+
+M --> N[Driver 리소스 해제<br>driver.quit()]
 ```
 ### 단계 설명
 #### (1) 사용자/시스템으로부터 검색어 수집 (Batch 또는 On-demand)
