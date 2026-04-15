@@ -62,14 +62,14 @@ flowchart TD
     H --> I[레시피 URL 추출]
 
     I --> J[리스트 저장]
-    J --> K[titles.append(title)]
-    J --> L[urls.append(url)]
+    J --> K[제목 리스트 저장]
+    J --> L[URL 리스트 저장]
 
     L --> M[상세 페이지 파싱 준비]
     M --> N[Driver 안전 종료]
-
 ```
 --- 
+
 
 ## 5. 사용 URL
 
