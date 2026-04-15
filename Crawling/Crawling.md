@@ -332,23 +332,24 @@ flowchart TD
 ```
 
 ---
-    ```python 
-        from concurrent.futures import ThreadPoolExecutor
+```python 
+    from concurrent.futures import ThreadPoolExecutor
 
-        def crawl_recipe(url):
-            driver = get_headless_driver()
-            driver.get(url)
+    def crawl_recipe(url):
+        driver = get_headless_driver()
+        driver.get(url)
 
-            # 재료 추출 로직
-            ingredients = parse_ingredients(driver)
+        # 재료 추출 로직
+        ingredients = parse_ingredients(driver)
 
-            driver.quit()
-            return ingredients
+        driver.quit()
+        return ingredients
 
 
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            results = executor.map(crawl_recipe, recipe_urls)
-    ```
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = executor.map(crawl_recipe, recipe_urls)
+```
+
 ---
 
 ## 11. 병렬 크롤링 구조 (Parallel Crawling Architecture)
