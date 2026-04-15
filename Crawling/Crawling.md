@@ -195,9 +195,9 @@ soup.select(".common_sp_list_li")
 ### Anti-Bot 회피
 Headless 모드 실행 시 서버에서 자동화 봇으로 감지할 수 있다.
 이를 최소화하기 위해 다음 설정을 권장한다.
--	User-Agent 설정
--	요청 간격 조절
--	랜덤 대기 시간 추가
+- User-Agent 설정
+- 요청 간격 조절
+- 랜덤 대기 시간 추가
 
 예시
 ```python 
@@ -210,25 +210,24 @@ Headless 모드 실행 시 서버에서 자동화 봇으로 감지할 수 있다
 ### 데이터 가공 준비 (정규표현식)
     레시피 상세 페이지에서 재료 데이터를 수집할 경우 다음과 같은 형태의 데이터가 존재한다.
 
-    예시
-    - 돼지고기 200g
-    - 마늘 2큰술
-    - 소금 약간
+#### 예시
+- 돼지고기 200g
+- 마늘 2큰술
+- 소금 약간
 
-    이 데이터를 다음 구조로 분리하는 것이 이상적이다.
-    [재료명, 수량, 단위]
+이 데이터를 다음 구조로 분리하는 것이 이상적이다.
+[재료명, 수량, 단위]
 
-    예시
-        [돼지고기, 200, g]
-        [마늘, 2, 큰술]
-        [소금, 약간, None]
+#### 예시
+[돼지고기, 200, g]
+[마늘, 2, 큰술]
+[소금, 약간, None]
 
 
-    이를 위해 정규표현식(re) 기반 파싱 모듈을 별도로 분리하는 것을 권장한다.
-    
-    예시 구조
-        Utils/
-        text_clean.py
+이를 위해 정규표현식(re) 기반 파싱 모듈을 별도로 분리하는 것을 권장한다.
+#### 예시 구조
+Utils/
+text_clean.py
 
 ---
 
@@ -270,12 +269,12 @@ flowchart TD
 ```
 
 ### 병렬 처리 구현 예시
-    ```python 
-        from concurrent.futures import ThreadPoolExecutor
+```python 
+    from concurrent.futures import ThreadPoolExecutor
 
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            executor.map(crawl_recipe, recipe_urls)
-    ```
+    with ThreadPoolExecutor(max_workers=4) as executor:
+    executor.map(crawl_recipe, recipe_urls)
+```
 
 
 # 9. 병렬 크롤링 구조 (Parallel Crawling Architecture)
