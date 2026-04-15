@@ -44,12 +44,11 @@
 
 ```mermaid
 flowchart TD
-
-A[List[Dict] 수집 데이터] --> B[DataFrame 변환]
-B --> C[필드 구조 최적화]
-C --> D[문자열 직렬화]
-D --> E[중복 제거 (URL 기준)]
-E --> F[최종 DataFrame 생성]
+A["List[Dict] 수집 데이터"] --> B["DataFrame 변환"]
+B --> C["필드 구조 최적화"]
+C --> D["문자열 직렬화"]
+D --> E["중복 제거 (URL 기준)"]
+E --> F["최종 DataFrame 생성"]
 ```
 
 ---
@@ -140,13 +139,13 @@ df = df.reset_index(drop=True)
 
 ```mermaid id="df_pipeline"
 flowchart TD
-A[List[Dict] 크롤링 데이터] --> B[DataFrame 변환]
-B --> C[필드 구조 표준화]
-C --> D[리스트 → 문자열 직렬화]
-D --> E[중복 제거 (URL 기준)]
-E --> F[인덱스 재정렬]
-F --> G[최종 DataFrame 생성]
-G --> H[DB 저장 또는 추천 시스템 전달]
+A["크롤링 데이터 (List of Dict)"] --> B["DataFrame 변환"]
+B --> C["필드 구조 표준화"]
+C --> D["리스트 → 문자열 직렬화"]
+D --> E["중복 제거 (URL 기준)"]
+E --> F["인덱스 재정렬"]
+F --> G["최종 DataFrame 생성"]
+G --> H["DB 저장 / 추천 시스템 전달"]
 ```
 
 ---
