@@ -21,17 +21,15 @@ Crawling.py 설계문서
             time
 
 
-4. 순서도 
-    1. 사용자에게 input을 통해 검색어를 입력 받는다.
-    2. driver를 셋팅한다.
-    3. 검색 URL 뒤에 검색어를 붙여 검색 결과를 가져온다
-    4. 레시피 개수 selector를 통해
-        4.1 레시피 개수가 0개이면 종료
-    5. 레시피 개수가 1개 이상일 경우 검색 결과 페이지에 표시된 모든 레시피 카드 요소를 가져온다.
-    6. 데이터 추출(레시피 제목, 레시피 URL)
-    -> 이 데이터는 각각 리스트에 저장된다
-        titles.append(title)
-        urls.append(url)
+4. 순서도 (개선)
+    (1) 사용자/시스템으로부터 검색어 수집 (Batch 또는 On-demand)
+    (2) driver_loader를 통한 독립적 브라우저 세션 생성
+    (3) 검색 결과 스캔 및 common_sp_list_li 클래스 기반 요소 추출
+    (4) [예외처리] 결과가 0개일 경우 '수집 불가' 로그 생성 후 종료
+    (5) 상세 페이지 병렬 접속 (ThreadPoolExecutor)
+    (6) 데이터 추출 및 DataCleaner를 통한 1차 정제
+    (7) RecipeDataManager를 통해 리스트 -> 문자열 직렬화 및 DB 저장
+    (8) driver.quit()을 통한 리소스 완전 해제`
 
 5. 사용 URL 
     검색 페이지
@@ -89,7 +87,24 @@ Crawling.py 설계문서
         추후 상세 페이지에서 재료를 긁어올 때 100g, 2큰술, 약간 같은 텍스트가 섞여 들어올 텐데, 
         이때 정규표현식(re)을 사용하여 **[재료명, 수량, 단위]**로 파싱하는 로직을 별도 모듈로 분리하면 챗봇 답변 생성 시 훨씬 깔끔한 데이터를 줄 수 있습니다.
 
+7. 추가사항 
+    병렬 처리를 적용한 Crawling.py 구조 제안
+        기존의 순차적(Sequential) 방식에서 병렬(Parallel) 방식으로 코드를 업그레이드
 
+    멀티스레딩 주의 사항
+        메모리 관리 (중요!)
+            max_workers=4라면 크롬 브라우저가 동시에 4개 뜹니다. 
+            맥북 프로 사양이라면 4~8개 정도가 적당합니다. 
+            너무 많이 띄우면 오히려 시스템이 느려져서 다시 ReadTimeoutError가 날 수 있습니다.
+
+        드라이버 독립성
+            스레드들이 하나의 driver 객체를 공유하면 절대 안 됩니다. 
+            각 스레드는 본인만의 driver를 생성하고(get_headless_driver), 
+            작업이 끝나면 반드시 quit()으로 닫아줘야 메모리 누수를 막을 수 있습니다.
+
+        서버 차단 방지
+            너무 빠른 속도로 요청을 보내면 사이트 측에서 IP를 차단할 수 있습니다. 
+            max_workers를 적절히 조절하고 필요하다면 중간에 랜덤하게 time.sleep을 섞어주는 센스가 필요합니다.
 에러
     Traceback (most recent call last):
     File "/Users/gangseongbin/Desktop/develop/python/AIProject/Crawling/Crawling.py", line 2, in <module>
@@ -133,3 +148,46 @@ Crawling.py 설계문서
                 from driver.driver_loader import get_headless_driver
 
         
+    ReadTimeoutError
+
+    원인 
+        첫째는 리소스 관리(Driver) 문제 
+        둘째는 네트워크/서버 응답(Wait) 문제
+
+    
+    해결방안 
+        1. 드라이버 통신 타임아웃 강제 연장 (driver_loader.py)
+            드라이버 객체를 생성할 때 브라우저와의 내부 통신 시간을 명시적으로 늘림
+                # driver/driver_loader.py 수정
+                def get_headless_driver():
+                    chrome_options = Options()
+                    # ... 기존 옵션 동일 ...
+                    
+                    service = Service(ChromeDriverManager().install())
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    
+                    # [핵심] 브라우저 명령 실행 타임아웃을 5분(300초)으로 설정
+                    driver.set_page_load_timeout(300) 
+                    driver.set_script_timeout(300)
+                    
+                    return driver
+
+        2. 페이지 로드 전략 변경 (성능 최적화)
+            기본적으로 Selenium은 페이지의 모든 이미지와 광고가 뜰 때까지 기다림
+            하지만 우리는 **텍스트(레시피)**만 필요하죠. 
+            로드 전략을 eager로 바꾸면 DOM 로딩까지만 기다리고 바로 파싱
+                # driver/driver_loader.py 옵션 추가
+                chrome_options.page_load_strategy = 'eager' # 'normal' 대신 사용
+
+        
+        
+
+    에러의 원인: "데이터 타입 불일치"
+        우리가 크롤링한 **재료(materials)**와 **조리 순서(steps)**는 파이썬에서 리스트(list) 형태입니다. 
+        그런데 SQLite 같은 일반적인 데이터베이스(SQL)는 하나의 칸(Cell)에 '리스트'를 통째로 집어넣는 것을 허용하지 않습니다. 
+        오직 문자열(String), 숫자(Integer/Float) 같은 기본 타입만 받을 수 있죠.
+        즉, **"리스트를 문자열로 변환해서 저장해!"**라는 처리가 빠져서 발생하는 문제입니다
+    
+    해결 방법
+        Crawling.py 내부의 데이터 가공 로직 수정
+        _save_to_db 함수를 호출하기 전에, 리스트 형태인 데이터를 텍스트로 합쳐주는 과정(Serialization)을 추가해야 합니다.

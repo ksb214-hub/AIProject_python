@@ -1,0 +1,45 @@
+RecipeChatBot.py
+
+데이터 바인딩(Data Binding) 흐름
+    우리가 열심히 크롤링한 processed_df를 RecipeAssistant 클래스에 통째로 넘겼습니다. 
+    챗봇은 이제 40개의 레시피라는 **'외장 하드'**를 장착한 셈입니다.
+
+학습(Training)의 가치
+    ListTrainer를 통해 레시피 제목을 학습시켰습니다. 
+    사용자가 "백종원 목살스테이크"라고만 입력해도, 
+    챗봇은 학습된 내용을 바탕으로 "목살스테이크를 찾으셨군요!"라고 문맥에 맞는 대답을 할 수 있게 됩니다.
+
+지능형 조건 분기 (Intent Parsing)
+    단순히 답변만 내뱉는 게 아니라, 
+    사용자 입력에 **'재료'**가 들어있는지 **'순서'**가 들어있는지를 파악합니다.
+    재료 요청 시: materials_str 컬럼의 데이터를 출력.
+    조리법 요청 시: steps_display 컬럼의 데이터를 출력.
+
+
+에러
+    ❗ 메인 로직 실행 중 오류 발생: Setup error:
+    The Spacy model for "English" language is missing.
+    Please install the model using the command:
+    python -m spacy download en_core_web_sm
+    See https://spacy.io/usage/models for more information about available models.
+
+
+    해결방안
+        1. Spacy 모델 설치 (가장 빠른 해결책)
+            python -m spacy download en_core_web_sm
+
+
+코드 변경 
+    컨텍스트 유지 (Stateful): self.current_recipe를 통해 챗봇이 **"아, 이 사람이 아까 물어본 그 요리에 대해서 계속 말하고 있구나"**라는 것을 알게 됩니다. 이제 "재료"라고만 짧게 입력해도 정확한 답변이 나옵니다.
+    공백 무시 비교: 사용자가 "목살 스테이크"라고 하든 "목살스테이크"라고 하든 replace(" ", "") 덕분에 유연하게 찾아냅니다.
+    ChatterBot 의존도 감소: AI 엔진은 가끔 엉뚱한 소리를 합니다. 그래서 우리가 수집한 데이터(DataFrame)를 먼저 검색하고, 없을 때만 AI 엔진을 사용하도록 우선순위를 조정했습니다. 이것이 실무에서 말하는 '하이브리드 챗봇' 구조입니다.
+
+
+데이터가 왕이다 (Data-First): 챗봇이 아무리 똑똑해도 우리가 크롤링한 데이터가 없으면 무용지물입니다. 그래서 로직의 1순위는 언제나 self.db(데이터프레임) 검색입니다.
+맥락 유지 (Context Retention): self.current_recipe라는 작은 변수 하나가 "재료"라는 한 단어만으로도 정확한 답을 내놓게 만드는 마법을 부립니다.
+사용자 배려 (UX): "안녕하세요"라고 가만히 기다리는 게 아니라, "이런 요리가 있어요"라고 먼저 제안하는 것이 좋은 개발자의 센스입니다.
+
+기능 추가 
+    페르소나를 입혀서 각 사람들이 상황별에 맞게 셋팅을 유도하게 하는 역할을 함 
+        예)
+            1인가구에 맞는 요리

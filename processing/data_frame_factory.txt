@@ -1,0 +1,18 @@
+데이터 가공 라이브러리 (processing/data_frame_factory.py)
+    이 파일에 대한 설명 
+        수집된 dict 형태의 리스트를 받아서 정형화된 DataFrame으로 변환하고 저장하는 역할
+    
+    사용 라이브러리
+        pandas 
+
+    흐름도 
+
+        Data Flow: List[Dict] 
+            ↓
+        DataFrame
+            ↓
+        필드 최적화
+            ↓
+        최종 데이터셋
+    
+    
