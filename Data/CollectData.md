@@ -49,21 +49,13 @@
 
 ```mermaid
 flowchart TD
-
-A[CollectData 호출] --> B[DB 연결 또는 파일 생성]
-
-B --> C[기존 데이터 존재 확인]
-
+A[CollectData 호출] --> B[DB 연결]
+B --> C[기존 데이터 확인]
 C --> D{데이터 존재 여부}
-
-D -->|Yes| E[데이터 반환 후 종료]
-
-D -->|No| F[크롤링 실행 (Crawling.py)]
-
+D -->|Yes| E[DB 데이터 반환]
+D -->|No| F[크롤링 실행]
 F --> G[DataFrame 생성]
-
 G --> H[DB 저장]
-
 H --> I[저장 완료 반환]
 ```
 
@@ -153,20 +145,15 @@ df.to_sql(
 
 ```mermaid id="collectdata_flow"
 flowchart TD
-
-A[CollectData 실행] --> B[DB 연결 또는 생성]
+A[CollectData 실행] --> B[DB 연결]
 B --> C[기존 데이터 조회]
-
 C --> D{데이터 존재 여부}
-
-D -->|존재함| E[DB 데이터 반환 후 종료]
-
-D -->|없음| F[Crawling 모듈 실행]
-
-F --> G[레시피 DataFrame 생성]
-G --> H[데이터 정제 및 검증]
-H --> I[DB 저장 (to_sql)]
-I --> J[저장 완료 데이터 반환]
+D -->|존재| E[DB 데이터 반환]
+D -->|없음| F[Crawling 실행]
+F --> G[DataFrame 생성]
+G --> H[데이터 정제]
+H --> I[DB 저장]
+I --> J[저장 완료 반환]
 ```
 
 ---
