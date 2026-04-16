@@ -1,6 +1,6 @@
 # data_frame_factory.py 설계 문서  
 
-(데이터 가공 라이브러리 - processing/data_frame_factory.py)
+> (데이터 가공 라이브러리 - processing/data_frame_factory.py)
 
 ---
 
