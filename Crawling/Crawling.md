@@ -34,10 +34,11 @@
 ## 3. 사용 기술 (Technology)
 
 ### 사용 언어
+
 ### 사용 라이브러리
 
 | 라이브러리 | 역할 |
-|---|---|
+| --- | --- |
 | Selenium | 동적 웹 페이지 크롤링 |
 | BeautifulSoup (bs4) | HTML 파싱 |
 | webdriver_manager | ChromeDriver 자동 설치 |
