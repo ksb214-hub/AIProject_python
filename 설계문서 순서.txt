@@ -1,0 +1,9 @@
+## 설계 문서 작성 순서
+## 1. 개요 (Overview)
+## 2. 역할 (Role)
+## 3. 사용 기술 (Technology)
+## 4. 데이터 흐름 (Flow)
+## 5. 전체 동작 흐름 (Pipeline)
+## 6. 설계 의도 (Why this design?)
+## 7. 한 줄 정리 (Summary)
+## 8. 현재 상황

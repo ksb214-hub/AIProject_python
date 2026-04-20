@@ -71,47 +71,63 @@ K --> L[데이터 직렬화]
 L --> M[Database 저장]
 M --> N[Driver 종료]
 ```
+
 ### 단계 설명
+
 #### (1) 사용자/시스템으로부터 검색어 수집 (Batch 또는 On-demand)
+
 - 사용자 입력
 - Batch 크롤링 스케줄러
 - 시스템 자동 데이터 보충
 
 #### (2) driver_loader를 통한 독립적 브라우저 세션 생성
+
 driver_loader 모듈을 사용하여 Selenium WebDriver를 생성한다.
 
 #### (3) 검색 결과 스캔 및 common_sp_list_li 클래스 기반 요소 추출
+
 레시피 검색 결과 페이지에서 레시피 카드 목록을 수집한다.
 
 #### (4) [예외처리] 결과가 0개일 경우 '수집 불가' 로그 생성 후 종료
+
 검색 결과가 없는 경우 다음 처리를 수행한다.
+
 - 로그 기록
 - 크롤링 중단
 - 다음 키워드로 이동
 
 #### (5) 상세 페이지 병렬 접속 (ThreadPoolExecutor)
-ThreadPoolExecutor를 활용하여 상세 페이지 크롤링을 병렬 처리한다.
+
+> ThreadPoolExecutor를 활용하여 상세 페이지 크롤링을 병렬 처리한다.
 
 장점
+
 - 수집 속도 향상
 - 네트워크 대기 시간 최소화
 
 주의사항
+
 - 각 스레드는 독립적인 driver 사용
 - 작업 종료 후 반드시 quit() 수행
 
 #### (6) 데이터 추출 및 DataCleaner를 통한 1차 정제
+
 DataCleaner 모듈을 통해 다음 작업 수행
+
 - 재료 단위 제거
--  불필요 텍스트 제거
+- 불필요 텍스트 제거
 - 문자열 정규화
 
 #### (7) RecipeDataManager를 통해 리스트 -> 문자열 직렬화 및 DB 저장
-RecipeDataManager 모듈에서 데이터를 직렬화하여 DB에 저장한다.
+
+> RecipeDataManager 모듈에서 데이터를 직렬화하여 DB에 저장한다.
 
 #### (8) driver.quit()을 통한 리소스 완전 해제`
-모든 작업이 완료되면 Selenium Driver를 종료한다.
+
+> 모든 작업이 완료되면 Selenium Driver를 종료한다.
+
 효과
+
 - 메모리 누수 방지
 - 크롬 프로세스 정리
 - 안정적인 장기 실행 가능
@@ -119,26 +135,27 @@ RecipeDataManager 모듈에서 데이터를 직렬화하여 DB에 저장한다.
 ## 5. 사용 URL
 
 ### 검색 페이지
-    https://www.10000recipe.com/recipe/list.html?q=
-    검색어를 URL 뒤에 붙여 레시피 검색 결과를 가져온다.
 
-    예시
-        https://www.10000recipe.com/recipe/list.html?q=김치
+https://www.10000recipe.com/recipe/list.html?q=
+검색어를 URL 뒤에 붙여 레시피 검색 결과를 가져온다.
+
+예시
+> https://www.10000recipe.com/recipe/list.html?q=김치
 
 ---
 
 ### 상세 페이지
-    https://www.10000recipe.com
-    상세 레시피 페이지는 **상대 경로(relative path)** 형태로 제공된다.
-    
-    예시
-        /recipe/6921234
-        
-    따라서 Base URL과 결합하여 사용해야 한다.
 
-    예시
-        https://www.10000recipe.com/recipe/6921234
+https://www.10000recipe.com
+상세 레시피 페이지는 **상대 경로(relative path)** 형태로 제공된다.
 
+예시
+> /recipe/6921234
+
+따라서 Base URL과 결합하여 사용해야 한다.
+
+예시
+> https://www.10000recipe.com/recipe/6921234
 
 ---
 
@@ -147,7 +164,8 @@ RecipeDataManager 모듈에서 데이터를 직렬화하여 DB에 저장한다.
 Crawling.py는 다음 Selector를 사용하여 데이터를 수집한다.
 
 ### 레시피 개수 Selector
-    #contents_area_full > ul > div > b
+
+> #contents_area_full > ul > div > b
 
 검색 결과의 레시피 개수를 확인하는 Selector이다.
 
@@ -160,20 +178,22 @@ Crawling.py는 다음 Selector를 사용하여 데이터를 수집한다.
 ---
 
 ### 레시피 목록 Selector
-    #contents_area_full > ul > ul > li
+
+>#contents_area_full > ul > ul > li
 
 검색 결과 페이지에 표시된 **모든 레시피 카드 요소**를 가져온다.
 
 ---
 
 ### 재료 Selector
-    #divConfirmedMaterialArea > ul:nth-child(1) > li
+
+> #divConfirmedMaterialArea > ul:nth-child(1) > li
 
 레시피 상세 페이지에서 **재료 목록을 추출하는 Selector**이다.
 
 ---
 
-## 7. Technical Review 
+## 7. Technical Review
 
 ### Selector 유연성
 
@@ -191,24 +211,28 @@ soup.select(".common_sp_list_li")
 ```
 
 ### Anti-Bot 회피
+
 Headless 모드 실행 시 서버에서 자동화 봇으로 감지할 수 있다.
 이를 최소화하기 위해 다음 설정을 권장한다.
+
 - User-Agent 설정
 - 요청 간격 조절
 - 랜덤 대기 시간 추가
 
 예시
+
 ```python 
     chrome_options.add_argument(
     "User-Agent=Mozilla/5.0 (Macintosh; Intel Mac OS X)"
     )
 ```
 
-
 ### 데이터 가공 준비 (정규표현식)
-    레시피 상세 페이지에서 재료 데이터를 수집할 경우 다음과 같은 형태의 데이터가 존재한다.
+
+레시피 상세 페이지에서 재료 데이터를 수집할 경우 다음과 같은 형태의 데이터가 존재한다.
 
 #### 예시
+
 - 돼지고기 200g
 - 마늘 2큰술
 - 소금 약간
@@ -216,14 +240,16 @@ Headless 모드 실행 시 서버에서 자동화 봇으로 감지할 수 있다
 이 데이터를 다음 구조로 분리하는 것이 이상적이다.
 [재료명, 수량, 단위]
 
-#### 예시
+예시
+
 [돼지고기, 200, g]
 [마늘, 2, 큰술]
 [소금, 약간, None]
 
-
 이를 위해 정규표현식(re) 기반 파싱 모듈을 별도로 분리하는 것을 권장한다.
+
 #### 예시 구조
+
 Utils/
 text_clean.py
 
@@ -267,15 +293,15 @@ flowchart TD
 ```
 
 ### 병렬 처리 구현 예시
-```python 
+
+```python
     from concurrent.futures import ThreadPoolExecutor
 
     with ThreadPoolExecutor(max_workers=4) as executor:
     executor.map(crawl_recipe, recipe_urls)
 ```
 
-
-# 9. 병렬 크롤링 구조 (Parallel Crawling Architecture)
+## 9. 병렬 크롤링 구조 (Parallel Crawling Architecture)
 
 기존 Crawling.py는 **순차적(Sequential) 방식**으로 동작한다.  
 즉, 하나의 레시피를 크롤링한 후 다음 레시피를 처리하는 구조이다.
@@ -310,6 +336,7 @@ E --> F[데이터 병합]
 F --> G[DataFrame 생성]
 G --> H[CSV 저장]
 ```
+
 ---
 
 ## 10. 병렬 크롤링 구조 (Parallel Crawling Architecture)
@@ -333,7 +360,8 @@ flowchart TD
 ```
 
 ---
-```python 
+
+```python
     from concurrent.futures import ThreadPoolExecutor
 
     def crawl_recipe(url):
@@ -387,9 +415,9 @@ J --> K[CSV 저장]
 ### 병렬 처리 핵심 아이디어
 
 각 스레드는 다음 작업을 수행한다.
-	1.	독립적인 Selenium Driver 생성
-	2.	레시피 상세 페이지 접속
-	3.	재료 데이터 파싱
-	4.	데이터 반환
-	5.	Driver 종료
 
+1. 독립적인 Selenium Driver 생성
+2. 레시피 상세 페이지 접속
+3. 재료 데이터 파싱
+4. 데이터 반환
+5. Driver 종료
